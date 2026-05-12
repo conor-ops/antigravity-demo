@@ -1,7 +1,7 @@
 # waverunner-llamaindex
 
 A small CLI to set up and run a **WaveRunner** agent backed by your own GitHub
-repository as a data source, with optional LlamaParse/LiteParse skills for
+repository as a data source, with LlamaParse/LiteParse skills for
 parsing unstructured files.
 
 ## Requirements
