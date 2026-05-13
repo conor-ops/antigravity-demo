@@ -67,6 +67,14 @@ wavellama setup --no-send-api-key   # LiteParse only, no key sent
 wavellama run --prompt "Summarize the PDFs in /data"
 ```
 
+### 4. `wavellama reset` — reset the environment
+
+Reset the environment in `.waveconfig.json` to `null` so that you can set up a new one.
+
+```bash
+wavellama reset
+```
+
 ## Config file
 
 `.waveconfig.json` is created and updated by the CLI. It looks like:

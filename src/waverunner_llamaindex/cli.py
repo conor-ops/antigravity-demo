@@ -6,7 +6,7 @@ from typing import Annotated
 import typer
 from typer import Typer
 
-from .client import CONFIG_PATH, WaverRunnerClient
+from .client import CONFIG_PATH, WaverRunnerClient, get_config
 from .gitrepo import init_and_push
 from .models import Config, GitHubConfig
 
@@ -100,3 +100,13 @@ def run_agent(
 ) -> None:
     client = WaverRunnerClient()
     asyncio.run(client.send_request(prompt=prompt))
+
+
+@app.command(
+    name="reset", help="Eliminate the current environment to create a new one."
+)
+def reset() -> None:
+    config = get_config()
+    config.environment = None
+    with open(CONFIG_PATH, "w") as f:
+        json.dump(config.model_dump(), f, indent=2)

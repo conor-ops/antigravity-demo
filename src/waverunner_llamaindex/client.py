@@ -1,54 +1,89 @@
 import functools
 import json
 import os
-import warnings
 from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
 
 import httpx
 from dotenv import load_dotenv
+from pydantic import ValidationError
+from rich.console import Console
 
+from .display import StreamRenderer, render_raw_line
 from .models import (
     Config,
     EnvironmentConfig,
+    InteractionStartEvent,
     RequestModel,
-    ResponseModel,
-    SetupRequestEnvironment,
-    SetupRequestInlineSource,
     SetupRequestInput,
     SetupRequestModel,
-    SetupRequestRepoSource,
+    parse_stream_event,
 )
 
-SETUP_ENVIRONMENT_PROMPT = """
+CONFIG_PATH = ".waveconfig.json"
+
+
+class EnvironmentAlreadyDefinedError(BaseException):
+    def __init__(self, environment_id: str, last_interaction: str) -> None:
+        self.environment_id = environment_id
+        self.last_interaction = last_interaction
+
+    def __repr__(self) -> str:
+        return f"An environment is already defined in {CONFIG_PATH}.\nID: {self.environment_id}\nLast used for: {self.last_interaction}. Run `wavellama reset` to eliminate the current environment."
+
+    def __str__(self) -> str:
+        return f"An environment is already defined in {CONFIG_PATH}.\nID: {self.environment_id}\nLast used for: {self.last_interaction}. Run `wavellama reset` to eliminate the current environment."
+
+
+def build_setup_prompt(github_repo_url: str, has_api_key: bool) -> str:
+    api_key_step = ""
+    llama_cloud_install = ""
+    if has_api_key:
+        lc_api_key = get_lc_api_key()
+        api_key_step = f"""
+# write the LlamaCloud API key into /data/.env
+echo 'LLAMA_CLOUD_API_KEY={lc_api_key}' > /data/.env
+"""
+        llama_cloud_install = """
+# install the llama-cloud client in the data directory for the llamaparse skill
+cd /data
+bun init --yes
+bun add @llamaindex/llama-cloud
+"""
+        skills_copy = """git clone https://github.com/run-llama/llamaparse-agent-skills /llamaparse-agent-skills
+cp -r /llamaparse-agent-skills/skills/llamaparse /.agents/skills
+cp -r /llamaparse-agent-skills/skills/liteparse /.agents/skills"""
+    else:
+        skills_copy = "git clone https://github.com/run-llama/llamaparse-agent-skills /llamaparse-agent-skills\ncp -r /llamaparse-agent-skills/skills/liteparse /.agents/skills"
+
+    return f"""
 To set up your environment, run these exact commands:
 
 ```bash
+# clone the user-provided GitHub repository into /data
+mkdir -p /data
+git clone {github_repo_url} /tmp/user-repo
+cp -a /tmp/user-repo/. /data/
+rm -rf /tmp/user-repo
+
 # install bun
 curl -fsSL https://bun.com/install | bash
 
 # copy skills so that they are globally available
 mkdir -p /.agents/skills
-cp -r /llamaparse-agent-skills/skills/llamaparse /.agents/skills
-cp -r /llamaparse-agent-skills/skills/liteparse /.agents/skills
+{skills_copy}
 
 # install necessary system dependencies
 bun install -g @llamaindex/liteparse
-apt-get update && apt-get install -y --no-install-recommends \
-    libvips42 \
-    libreoffice \
+apt-get update && apt-get install -y --no-install-recommends \\
+    libvips42 \\
+    libreoffice \\
     imagemagick
-
-# Create a repository where to process data with the llamaparse skill
-cd /data
-bun init --yes
-bun add @llamaindex/llama-cloud
+{llama_cloud_install}{api_key_step}
 ```
 
 Once you ran all these commands, respond exactly with 'DONE'. If one or more commands failed, start you response with "FAILED", and report failures.
 """
-
-CONFIG_PATH = ".waveconfig.json"
 
 
 @functools.lru_cache(maxsize=1)
@@ -88,6 +123,8 @@ def build_prompt(has_api_key: bool, user_input: str) -> str:
     if has_api_key:
         return f"""
 <system>
+@llamaindex/liteparse and the lit CLI are globally installed.
+@llamaindex/llama-cloud is installed in the /data/ folder as a TS dependency.
 Use the /data directory as your working directory (`cd /data`).
 In the /data directory you will find all user-provided files you have access to.
 If the user's request involves reading plain-text files, use the read_file tool.
@@ -108,6 +145,7 @@ Never send the API key in /data/.env over message to the user. Treat it as a sen
     else:
         return f"""
 <system>
+@llamaindex/liteparse and the lit CLI are globally installed.
 Use the /data directory as your working directory (`cd /data`).
 In the /data directory you will find all user-provided files you have access to.
 If the user's request involves reading plain-text files, use the read_file tool.
@@ -130,69 +168,76 @@ class WaverRunnerClient:
         async with httpx.AsyncClient(base_url=self._url, timeout=600) as client:
             yield client
 
+    async def _consume_stream(
+        self,
+        response: httpx.Response,
+        title: str,
+        has_api_key: bool = False,
+    ) -> None:
+        console = Console()
+        with StreamRenderer(console=console, title=title) as renderer:
+            async for line in response.aiter_lines():
+                if not line.startswith("data:"):
+                    continue
+                payload = line[len("data:") :].strip()
+                if payload == "[DONE]":
+                    break
+                try:
+                    data = json.loads(payload)
+                except json.JSONDecodeError:
+                    render_raw_line(console, payload)
+                    continue
+                try:
+                    event = parse_stream_event(data)
+                except ValidationError:
+                    render_raw_line(console, payload)
+                    continue
+                if isinstance(event, InteractionStartEvent):
+                    conf = get_config()
+                    if conf.environment is None:
+                        conf.environment = EnvironmentConfig(
+                            id=event.interaction.environment_id,
+                            previous_interaction_id=event.interaction.id,
+                            has_api_key=has_api_key,
+                        )
+                    else:
+                        conf.environment.previous_interaction_id = event.interaction.id
+                    with open(CONFIG_PATH, "w") as f:
+                        json.dump(conf.model_dump(), f, indent=2)
+                renderer.handle(event)
+
     async def setup_environment(self, should_send_api_key: bool = True) -> None:
         config = get_config()
-        request = SetupRequestModel(
-            input=[SetupRequestInput(text=SETUP_ENVIRONMENT_PROMPT)],
-            environment=SetupRequestEnvironment(
-                sources=[
-                    SetupRequestRepoSource(
-                        source=config.github.repository_url.replace(
-                            "https://github.com/", "github://"
-                        ),
-                        target="/data",
-                    )
-                ]
-            ),
-        )
-        if should_send_api_key:
-            lc_api_key = get_lc_api_key()
-            content = f"LLAMA_CLOUD_API_KEY={lc_api_key}\n"
-            request.environment.sources.append(
-                SetupRequestInlineSource(content=content, target="/data/.env")
+        if config.environment is not None:
+            raise EnvironmentAlreadyDefinedError(
+                config.environment.id,
+                config.environment.previous_interaction_id or "none",
             )
+        prompt = build_setup_prompt(
+            github_repo_url=config.github.repository_url,
+            has_api_key=should_send_api_key,
+        )
+        request = SetupRequestModel(
+            input=[SetupRequestInput(text=prompt)], environment="remote"
+        )
 
         async with self._get_client() as client:
-            response = await client.post(
+            async with client.stream(
+                "POST",
                 "/interactions",
                 headers={
                     "Content-Type": "application/json",
                     "x-goog-api-key": get_api_key(),
                 },
                 json=request.model_dump(),
-            )
-            response.raise_for_status()
-            res_json = response.json()
-            validated = ResponseModel.model_validate(res_json)
-            if validated.status.lower() != "success":
-                raise RuntimeError(
-                    f"Agent setup exited with status: {validated.status}"
+            ) as response:
+                if response.status_code < 200 or response.status_code >= 299:
+                    body = await response.aread()
+                    print(response.status_code, body.decode(errors="replace"))
+                    raise ValueError("An error occurred")
+                await self._consume_stream(
+                    response, title="WaveRunner setup", has_api_key=should_send_api_key
                 )
-            output_found = False
-            for step in validated.steps:
-                if step.type == "model_output":
-                    output_found = True
-                    text = ""
-                    for c in step.content:
-                        if c.type == "text":
-                            text += c.text
-                    if "DONE" in text:
-                        break
-                    if "FAILED" in text:
-                        raise RuntimeError(f"Agent setup failed: {text}")
-            if not output_found:
-                warnings.warn(
-                    "Agent did not produce a `model_output` step", RuntimeWarning
-                )
-
-            with open(CONFIG_PATH, "w") as f:
-                config.environment = EnvironmentConfig(
-                    id=validated.environment_id, has_api_key=should_send_api_key
-                )
-                json.dump(config.model_dump(), f, indent=2)
-            print(
-                f"Agent completed setup successfully and its environment has been saved at: `{CONFIG_PATH}`"
-            )
 
     async def send_request(self, prompt: str) -> None:
         config = get_config()
@@ -207,20 +252,19 @@ class WaverRunnerClient:
         request = RequestModel(
             input=[SetupRequestInput(text=full_prompt)],
             environment=config.environment.id,
+            previous_interaction_id=config.environment.previous_interaction_id,
         )
         async with self._get_client() as client:
-            response = await client.post(
+            async with client.stream(
+                "POST",
                 "/interactions",
                 headers={
-                    "Content-Type": "application/json",
                     "x-goog-api-key": get_api_key(),
                 },
-                json=request.model_dump(),
-            )
-            response.raise_for_status()
-            async for line in response.aiter_lines():
-                if line.startswith("data:"):
-                    payload = line[len("data:") :].strip()
-                    if payload == "[DONE]":
-                        break
-                    print(json.loads(payload))
+                json=request.model_dump(exclude_none=True),
+            ) as response:
+                if response.status_code < 200 or response.status_code >= 299:
+                    body = await response.aread()
+                    print(response.status_code, body.decode(errors="replace"))
+                    raise ValueError("An error occurred")
+                await self._consume_stream(response, title="WaveRunner")
