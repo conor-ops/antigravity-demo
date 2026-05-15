@@ -15,7 +15,7 @@ app = Typer()
 
 @app.command(
     name="git-wiz",
-    help="Setup the GitHub repository that will be used as data source for your WaveRunner agent. `git` and the `gh` CLI are necessary for this step.",
+    help="Setup the GitHub repository that will be used as data source for your Antigravity agent. `git` and the `gh` CLI are necessary for this step.",
 )
 def git_wiz(
     directory: Annotated[
@@ -72,7 +72,7 @@ def git_wiz(
 
 @app.command(
     name="setup",
-    help="Setup and save the environment in which your WaveRunner agent will run",
+    help="Setup and save the environment in which your Antigravity agent will run",
 )
 def setup_agent(
     send_api_key: Annotated[
@@ -87,7 +87,7 @@ def setup_agent(
     asyncio.run(client.setup_environment(should_send_api_key=send_api_key))
 
 
-@app.command(name="run", help="Run your WaveRunner agent with a specific prompt")
+@app.command(name="run", help="Run your Antigravity agent with a specific prompt")
 def run_agent(
     prompt: Annotated[
         str,

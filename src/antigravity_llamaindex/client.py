@@ -236,7 +236,7 @@ class WaverRunnerClient:
                     print(response.status_code, body.decode(errors="replace"))
                     raise ValueError("An error occurred")
                 await self._consume_stream(
-                    response, title="WaveRunner setup", has_api_key=should_send_api_key
+                    response, title="Antigravity setup", has_api_key=should_send_api_key
                 )
 
     async def send_request(self, prompt: str) -> None:
@@ -267,4 +267,4 @@ class WaverRunnerClient:
                     body = await response.aread()
                     print(response.status_code, body.decode(errors="replace"))
                     raise ValueError("An error occurred")
-                await self._consume_stream(response, title="WaveRunner")
+                await self._consume_stream(response, title="Antigravity")

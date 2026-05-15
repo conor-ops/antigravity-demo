@@ -1,6 +1,6 @@
-# waverunner-llamaindex
+# antigravity-llamaindex
 
-A small CLI to set up and run a **WaveRunner** agent backed by your own GitHub
+A small CLI to set up and run an **Antigravity** agent backed by your own GitHub
 repository as a data source, with LlamaParse/LiteParse skills for
 parsing unstructured files.
 
@@ -21,24 +21,24 @@ Environment variables can be set in a local `.env` file.
 uv tool install .
 ```
 
-This exposes the `wavellama` command.
+This exposes the `llamagrav` command.
 
 ## Usage
 
-The CLI has three commands: `git-wiz`, `setup`, and `run`. They are meant to
+The CLI has four commands: `git-wiz`, `setup`, `run` and `resets`. They are meant to
 be run in order — each one persists state in `.waveconfig.json` in the current
 directory.
 
-### 1. `wavellama git-wiz` — publish your data to GitHub
+### 1. `llamagrav git-wiz` — publish your data to GitHub
 
 Initializes a git repo from a local directory, creates a GitHub repository,
 pushes the contents, and saves the repository URL to `.waveconfig.json`.
 
 ```bash
-wavellama git-wiz \
+llamagrav git-wiz \
     --directory ./my-data \
     --owner my-github-user \
-    --repo-name my-waverunner-data \
+    --repo-name my-antigravity-data \
     --description "Data for my WaveRunner agent"
 ```
 
@@ -51,28 +51,28 @@ Flags:
 | `-r`, `--repo-name` | Name of the GitHub repo to create |
 | `--description` | Optional repo description |
 
-### 2. `wavellama setup` — prepare the agent environment
+### 2. `llamagrav setup` — prepare the agent environment
 
-Provisions the remote WaveRunner environment from the repository configured
+Provisions the remote Antigravity environment from the repository configured
 above and saves the resulting environment id in `.waveconfig.json`.
 
 ```bash
-wavellama setup                  # uses LlamaParse (sends LlamaCloud key)
-wavellama setup --no-send-api-key   # LiteParse only, no key sent
+llamagrav setup                  # uses LlamaParse (sends LlamaCloud key)
+llamagrav setup --no-send-api-key   # LiteParse only, no key sent
 ```
 
-### 3. `wavellama run` — run the agent
+### 3. `llamagrav run` — run the agent
 
 ```bash
-wavellama run --prompt "Summarize the PDFs in /data"
+llamagrav run --prompt "Summarize the PDFs in /data"
 ```
 
-### 4. `wavellama reset` — reset the environment
+### 4. `llamagrav reset` — reset the environment
 
 Reset the environment in `.waveconfig.json` to `null` so that you can set up a new one.
 
 ```bash
-wavellama reset
+llamagrav reset
 ```
 
 ## Config file

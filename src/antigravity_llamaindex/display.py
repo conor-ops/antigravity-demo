@@ -1,4 +1,4 @@
-"""Rich-powered renderer for WaveRunner streaming events."""
+"""Rich-powered renderer for Antigravity streaming events."""
 
 from __future__ import annotations
 
@@ -56,7 +56,7 @@ class StreamRenderer:
     """
 
     def __init__(
-        self, console: Console | None = None, title: str = "WaveRunner"
+        self, console: Console | None = None, title: str = "Antigravity"
     ) -> None:
         self.console = console or Console()
         self.title = title
