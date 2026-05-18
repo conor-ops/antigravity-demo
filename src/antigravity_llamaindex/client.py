@@ -136,7 +136,10 @@ If the user explicitly requires quick and less accurate parsing, read the LitePa
 at `/.agents/skills/liteparse/SKILL.md` and use the `lit` CLI to parse the file.
 </system>
 <critical>
-Never send the API key in /data/.env over message to the user. Treat it as a sensitive secret
+- Never send the API key in /data/.env over message to the user. Treat it as a sensitive secret
+- The skills contain a series of questions to ask the user about environment setup. Assume that
+all those questions have a positive answer, given that the environment is pre-configured to include
+all the tools you need to execute scripts and commands in the skills.
 </critical>
 <user>
 {user_input}
