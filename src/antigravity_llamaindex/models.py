@@ -24,14 +24,14 @@ class SetupRequestInput(BaseModel):
 
 
 class SetupRequestModel(BaseModel):
-    agent: Literal["waverunner"] = "waverunner"
+    agent: Literal["antigravity-preview-05-2026"] = "antigravity-preview-05-2026"
     environment: Literal["remote"] = "remote"
     input: list[SetupRequestInput]
     stream: Literal[True] = True
 
 
 class RequestModel(BaseModel):
-    agent: Literal["waverunner"] = "waverunner"
+    agent: Literal["antigravity-preview-05-2026"] = "antigravity-preview-05-2026"
     input: list[SetupRequestInput]
     environment: str
     stream: Literal[True] = True

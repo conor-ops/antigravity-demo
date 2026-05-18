@@ -94,7 +94,7 @@ def run_agent(
         typer.Option(
             "--prompt",
             "-p",
-            help="The prompt to send to your WaveRunner agent.",
+            help="The prompt to send to your Antigravity agent.",
         ),
     ],
 ) -> None:

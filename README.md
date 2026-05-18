@@ -26,20 +26,20 @@ This exposes the `llamagrav` command.
 ## Usage
 
 The CLI has four commands: `git-wiz`, `setup`, `run` and `resets`. They are meant to
-be run in order — each one persists state in `.waveconfig.json` in the current
+be run in order — each one persists state in `.config.json` in the current
 directory.
 
 ### 1. `llamagrav git-wiz` — publish your data to GitHub
 
 Initializes a git repo from a local directory, creates a GitHub repository,
-pushes the contents, and saves the repository URL to `.waveconfig.json`.
+pushes the contents, and saves the repository URL to `.config.json`.
 
 ```bash
 llamagrav git-wiz \
     --directory ./my-data \
     --owner my-github-user \
     --repo-name my-antigravity-data \
-    --description "Data for my WaveRunner agent"
+    --description "Data for my Antigravity agent"
 ```
 
 Flags:
@@ -54,7 +54,7 @@ Flags:
 ### 2. `llamagrav setup` — prepare the agent environment
 
 Provisions the remote Antigravity environment from the repository configured
-above and saves the resulting environment id in `.waveconfig.json`.
+above and saves the resulting environment id in `.config.json`.
 
 ```bash
 llamagrav setup                  # uses LlamaParse (sends LlamaCloud key)
@@ -69,7 +69,7 @@ llamagrav run --prompt "Summarize the PDFs in /data"
 
 ### 4. `llamagrav reset` — reset the environment
 
-Reset the environment in `.waveconfig.json` to `null` so that you can set up a new one.
+Reset the environment in `.config.json` to `null` so that you can set up a new one.
 
 ```bash
 llamagrav reset
@@ -77,7 +77,7 @@ llamagrav reset
 
 ## Config file
 
-`.waveconfig.json` is created and updated by the CLI. It looks like:
+`.config.json` is created and updated by the CLI. It looks like:
 
 ```json
 {

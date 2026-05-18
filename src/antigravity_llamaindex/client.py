@@ -20,7 +20,7 @@ from .models import (
     parse_stream_event,
 )
 
-CONFIG_PATH = ".waveconfig.json"
+CONFIG_PATH = ".config.json"
 
 
 class EnvironmentAlreadyDefinedError(BaseException):
